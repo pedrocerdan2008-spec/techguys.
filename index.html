@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ciberlândia Log — Torre de Controle Logístico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0B1221;
+    --surface:#141B2E;
+    --surface-2:#1C2740;
+    --border:#28344E;
+    --text:#E8EDF7;
+    --muted:#8B98B8;
+    --accent:#4DA8FF;
+    --critical:#FF5C6E;
+    --warning:#FFB454;
+    --ok:#4ADE80;
+    --radius:10px;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{ max-width:1280px; margin:0 auto; }
+
+  /* Header */
+  .topbar{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:24px 32px; border-bottom:1px solid var(--border);
+    flex-wrap:wrap; gap:12px;
+  }
+  .brand{ display:flex; align-items:center; gap:14px; }
+  .brand-mark{
+    font-size:22px; color:var(--accent); width:48px; height:48px;
+    display:flex; align-items:center; justify-content:center;
+    border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);
+  }
+  .brand h1{ font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:700; letter-spacing:0.02em; }
+  .brand p{ font-size:13px; color:var(--muted); margin-top:2px; }
+  .status{
+    display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .pulse{
+    width:8px; height:8px; border-radius:50%; background:var(--ok);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(74,222,128,0.5); }
+    70%{ box-shadow:0 0 0 8px rgba(74,222,128,0); }
+    100%{ box-shadow:0 0 0 0 rgba(74,222,128,0); }
+  }
+
+  /* Filters */
+  .filters{ display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; padding:24px 32px; }
+  .filter-group{ display:flex; flex-direction:column; gap:6px; }
+  .filter-group label{ font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; }
+  select{
+    background:var(--surface); color:var(--text); border:1px solid var(--border);
+    border-radius:var(--radius); padding:10px 14px; font-family:'Inter',sans-serif;
+    font-size:14px; min-width:180px; cursor:pointer;
+  }
+  #reset-filtros{
+    background:transparent; color:var(--accent); border:1px solid var(--accent);
+    border-radius:var(--radius); padding:10px 18px; font-size:14px; cursor:pointer;
+    font-family:'Inter',sans-serif; transition:background 0.15s ease;
+  }
+  #reset-filtros:hover{ background:rgba(77,168,255,0.1); }
+
+  /* KPIs */
+  .kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; padding:0 32px 24px; }
+  .kpi-card{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:20px; display:flex; flex-direction:column; gap:8px;
+  }
+  .kpi-label{ font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); }
+  .kpi-value{ font-family:'JetBrains Mono',monospace; font-size:32px; font-weight:700; }
+  .kpi-value.critical{ color:var(--critical); }
+  .kpi-sub{ font-size:12px; color:var(--muted); }
+
+  /* Insights */
+  .insights{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; padding:0 32px 24px; }
+  .insight-card{
+    background:var(--surface-2); border-left:3px solid var(--accent); border-radius:var(--radius);
+    padding:16px; font-size:14px; line-height:1.5;
+  }
+  .insight-card strong{
+    font-family:'Space Grotesk',sans-serif; display:block; margin-bottom:6px;
+    font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--accent);
+  }
+
+  /* Charts */
+  .charts{ display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0 32px 24px; }
+  .chart-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+  .chart-card h2{ font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; margin-bottom:16px; }
+  .chart-card .chart-wrap{ height:260px; }
+
+  /* Dispatch board */
+  .dispatch{ padding:0 32px 24px; }
+  .dispatch h2{ font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; margin-bottom:16px; }
+  .dispatch-list{ display:flex; flex-direction:column; gap:10px; }
+  .ticket{
+    background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--ok);
+    border-radius:var(--radius); padding:14px 18px; display:flex; align-items:center; gap:16px;
+    flex-wrap:wrap;
+  }
+  .ticket.atrasado{ border-left-color:var(--warning); }
+  .ticket.critico{ border-left-color:var(--critical); }
+  .ticket-id{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted); min-width:64px; }
+  .ticket-info{ flex:1; font-size:14px; }
+  .ticket-info b{ font-family:'Space Grotesk',sans-serif; }
+  .ticket-badge{
+    font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700;
+    padding:4px 12px; border-radius:999px; text-transform:uppercase; letter-spacing:0.06em;
+    white-space:nowrap;
+  }
+  .ticket.no-prazo .ticket-badge{ background:rgba(74,222,128,0.15); color:var(--ok); }
+  .ticket.atrasado .ticket-badge{ background:rgba(255,180,84,0.15); color:var(--warning); }
+  .ticket.critico .ticket-badge{ background:rgba(255,92,110,0.15); color:var(--critical); animation:blink 1.4s infinite; }
+  @keyframes blink{ 0%,100%{ opacity:1; } 50%{ opacity:0.45; } }
+
+  /* Table */
+  .table-section{ padding:0 32px 16px; }
+  .table-section h2{ font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; margin-bottom:16px; }
+  .table-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); }
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  th,td{ padding:12px 16px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th{ background:var(--surface-2); font-family:'Space Grotesk',sans-serif; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); }
+  td.mono{ font-family:'JetBrains Mono',monospace; }
+  tr.row-critico td.status-cell{ color:var(--critical); font-weight:600; }
+  tr.row-atrasado td.status-cell{ color:var(--warning); font-weight:600; }
+  tr.row-no-prazo td.status-cell{ color:var(--ok); font-weight:600; }
+  tbody tr:hover{ background:var(--surface-2); }
+  tbody tr:last-child td{ border-bottom:none; }
+
+  /* Footer */
+  footer{ padding:20px 32px 40px; border-top:1px solid var(--border); color:var(--muted); font-size:12px; line-height:1.6; }
+  footer strong{ color:var(--text); }
+
+  /* Responsive */
+  @media (max-width:900px){
+    .kpis{ grid-template-columns:repeat(2,1fr); }
+    .insights{ grid-template-columns:1fr; }
+    .charts{ grid-template-columns:1fr; }
+  }
+  @media (max-width:600px){
+    .kpis{ grid-template-columns:1fr; }
+    .topbar,.filters,.kpis,.insights,.charts,.dispatch,.table-section,footer{ padding-left:16px; padding-right:16px; }
+    .ticket{ flex-direction:column; align-items:flex-start; }
+    .kpi-value{ font-size:26px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◉</span>
+      <div>
+        <h1>Ciberlândia Log</h1>
+        <p>Torre de controle — monitoramento de entregas</p>
+      </div>
+    </div>
+    <div class="status"><span class="pulse"></span> Dados atualizados</div>
+  </header>
+
+  <section class="filters">
+    <div class="filter-group">
+      <label for="filtro-transp">Transportadora</label>
+      <select id="filtro-transp"><option value="todas">Todas</option></select>
+    </div>
+    <div class="filter-group">
+      <label for="filtro-regiao">Região</label>
+      <select id="filtro-regiao"><option value="todas">Todas</option></select>
+    </div>
+    <button id="reset-filtros">Limpar filtros</button>
+  </section>
+
+  <section class="kpis">
+    <div class="kpi-card">
+      <span class="kpi-label">Total de entregas</span>
+      <span class="kpi-value" id="kpi-total">—</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Entregas atrasadas</span>
+      <span class="kpi-value" id="kpi-atrasadas">—</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">% de atraso</span>
+      <span class="kpi-value" id="kpi-pct">—</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Maior atraso individual</span>
+      <span class="kpi-value" id="kpi-pior">—</span>
+      <span class="kpi-sub" id="kpi-pior-sub">—</span>
+    </div>
+  </section>
+
+  <section class="insights" id="insights"></section>
+
+  <section class="charts">
+    <div class="chart-card">
+      <h2>Atraso médio por transportadora (dias)</h2>
+      <div class="chart-wrap"><canvas id="chart-transportadora"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h2>Atraso acumulado por região (dias)</h2>
+      <div class="chart-wrap"><canvas id="chart-regiao"></canvas></div>
+    </div>
+  </section>
+
+  <section class="dispatch">
+    <h2>Painel de despacho — prioridade de atenção</h2>
+    <div class="dispatch-list" id="dispatch-list"></div>
+  </section>
+
+  <section class="table-section">
+    <h2>Todas as entregas</h2>
+    <div class="table-wrap">
+      <table id="tabela-entregas">
+        <thead>
+          <tr>
+            <th>ID</th><th>Transportadora</th><th>Região</th>
+            <th>Prazo (dias)</th><th>Real (dias)</th><th>Atraso (dias)</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <strong>Como o atraso é calculado:</strong> atraso = dias_reais − prazo_dias.
+    Uma entrega é considerada <strong>atrasada</strong> quando esse valor é maior que zero.
+    Classificação usada no painel: <strong>crítico</strong> (atraso ≥ 5 dias),
+    <strong>atrasado</strong> (1 a 4 dias) e <strong>no prazo</strong> (0 dias ou entrega adiantada).
+  </footer>
+
+</div>
+
+<script>
+  const rawData = [
+    {id:301, transportadora:"RotaMax",  regiao:"Sudeste",      prazo:3, real:7},
+    {id:302, transportadora:"ViaCargo", regiao:"Sul",          prazo:5, real:5},
+    {id:303, transportadora:"FlashLog", regiao:"Nordeste",     prazo:4, real:9},
+    {id:304, transportadora:"RotaMax",  regiao:"Norte",        prazo:6, real:4},
+    {id:305, transportadora:"ViaCargo", regiao:"Centro-Oeste", prazo:2, real:6},
+    {id:306, transportadora:"FlashLog", regiao:"Sul",          prazo:5, real:12},
+    {id:307, transportadora:"RotaMax",  regiao:"Sul",          prazo:6, real:9},
+    {id:308, transportadora:"ViaCargo", regiao:"Sudeste",      prazo:3, real:4},
+    {id:309, transportadora:"FlashLog", regiao:"Norte",        prazo:5, real:5},
+    {id:310, transportadora:"ViaCargo", regiao:"Nordeste",     prazo:4, real:8},
+  ];
+
+  const data = rawData.map(d=>{
+    const atraso = d.real - d.prazo;
+    let status;
+    if(atraso >= 5) status = 'critico';
+    else if(atraso > 0) status = 'atrasado';
+    else status = 'no-prazo';
+    return {...d, atraso, status};
+  });
+
+  const transportadoras = [...new Set(data.map(d=>d.transportadora))].sort();
+  const regioes = [...new Set(data.map(d=>d.regiao))].sort();
+
+  const selectTransp = document.getElementById('filtro-transp');
+  transportadoras.forEach(t=>{
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    selectTransp.appendChild(opt);
+  });
+  const selectRegiao = document.getElementById('filtro-regiao');
+  regioes.forEach(r=>{
+    const opt = document.createElement('option');
+    opt.value = r; opt.textContent = r;
+    selectRegiao.appendChild(opt);
+  });
+
+  function statusLabel(status){
+    return {critico:'Crítico', atrasado:'Atrasado', 'no-prazo':'No prazo'}[status];
+  }
+
+  function severityColor(value){
+    if(value >= 4) return '#FF5C6E';
+    if(value > 0) return '#FFB454';
+    return '#4ADE80';
+  }
+
+  function groupStats(arr, key){
+    const groups = {};
+    arr.forEach(d=>{
+      if(!groups[d[key]]) groups[d[key]] = {count:0, atrasadas:0, sumAtraso:0};
+      groups[d[key]].count++;
+      groups[d[key]].sumAtraso += d.atraso;
+      if(d.atraso > 0) groups[d[key]].atrasadas++;
+    });
+    Object.values(groups).forEach(g=>{
+      g.avgAtraso = g.sumAtraso / g.count;
+      g.pctAtrasadas = (g.atrasadas / g.count) * 100;
+    });
+    return groups;
+  }
+
+  function getFiltered(){
+    const t = selectTransp.value;
+    const r = selectRegiao.value;
+    return data.filter(d=> (t==='todas' || d.transportadora===t) && (r==='todas' || d.regiao===r));
+  }
+
+  let chartTransp, chartRegiao;
+
+  function renderKPIs(filtered){
+    const total = filtered.length;
+    const atrasadas = filtered.filter(d=>d.atraso > 0).length;
+    const pct = total ? Math.round((atrasadas/total)*100) : 0;
+    const pior = filtered.reduce((max,d)=> (!max || d.atraso > max.atraso) ? d : max, null);
+
+    document.getElementById('kpi-total').textContent = total;
+    document.getElementById('kpi-atrasadas').textContent = atrasadas;
+
+    const kpiPct = document.getElementById('kpi-pct');
+    kpiPct.textContent = pct + '%';
+    kpiPct.classList.toggle('critical', pct >= 50);
+
+    const kpiPior = document.getElementById('kpi-pior');
+    const kpiPiorSub = document.getElementById('kpi-pior-sub');
+    if(pior && pior.atraso > 0){
+      kpiPior.textContent = '+' + pior.atraso + 'd';
+      kpiPior.classList.toggle('critical', pior.atraso >= 5);
+      kpiPiorSub.textContent = '#' + pior.id + ' · ' + pior.transportadora + ' · ' + pior.regiao;
+    } else {
+      kpiPior.textContent = '—';
+      kpiPior.classList.remove('critical');
+      kpiPiorSub.textContent = 'Nenhum atraso no filtro atual';
+    }
+  }
+
+  function renderInsights(filtered){
+    const box = document.getElementById('insights');
+    if(filtered.length === 0){
+      box.innerHTML = '<div class="insight-card"><strong>Sem dados</strong>Nenhuma entrega encontrada para os filtros selecionados.</div>';
+      return;
+    }
+    const byTransp = groupStats(filtered, 'transportadora');
+    const byRegiao = groupStats(filtered, 'regiao');
+
+    const worstTransp = Object.entries(byTransp).sort((a,b)=> b[1].avgAtraso - a[1].avgAtraso)[0];
+    const worstRegiao = Object.entries(byRegiao).sort((a,b)=>
+      (b[1].pctAtrasadas - a[1].pctAtrasadas) || (b[1].sumAtraso - a[1].sumAtraso)
+    )[0];
+    const pior = filtered.reduce((max,d)=> (!max || d.atraso > max.atraso) ? d : max, null);
+
+    let html = '';
+    html += `<div class="insight-card"><strong>Transportadora mais crítica</strong>${worstTransp[0]} tem o maior atraso médio entre as analisadas: ${worstTransp[1].avgAtraso.toFixed(1)} dias.</div>`;
+    html += `<div class="insight-card"><strong>Região mais crítica</strong>${worstRegiao[0]} concentra ${worstRegiao[1].pctAtrasadas.toFixed(0)}% de entregas atrasadas (${worstRegiao[1].sumAtraso} dias de atraso acumulado).</div>`;
+    if(pior && pior.atraso > 0){
+      html += `<div class="insight-card"><strong>Entrega prioritária</strong>A entrega #${pior.id} (${pior.transportadora}, ${pior.regiao}) está ${pior.atraso} dias atrasada e deve ser tratada primeiro.</div>`;
+    } else {
+      html += `<div class="insight-card"><strong>Status geral</strong>Nenhuma entrega atrasada no recorte atual.</div>`;
+    }
+    box.innerHTML = html;
+  }
+
+  function renderCharts(filtered){
+    const byTransp = groupStats(filtered, 'transportadora');
+    const byRegiao = groupStats(filtered, 'regiao');
+
+    const tLabels = Object.keys(byTransp);
+    const tData = tLabels.map(k=> +byTransp[k].avgAtraso.toFixed(2));
+    const tColors = tData.map(severityColor);
+
+    const rLabels = Object.keys(byRegiao);
+    const rData = rLabels.map(k=> byRegiao[k].sumAtraso);
+    const rColors = rData.map(severityColor);
+
+    const commonOptions = {
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ ticks:{ color:'#8B98B8' }, grid:{ color:'#28344E' } },
+        y:{ ticks:{ color:'#8B98B8' }, grid:{ color:'#28344E' }, beginAtZero:true }
+      }
+    };
+
+    if(chartTransp) chartTransp.destroy();
+    if(chartRegiao) chartRegiao.destroy();
+
+    chartTransp = new Chart(document.getElementById('chart-transportadora'), {
+      type:'bar',
+      data:{ labels:tLabels, datasets:[{ data:tData, backgroundColor:tColors, borderRadius:6 }] },
+      options: commonOptions
+    });
+    chartRegiao = new Chart(document.getElementById('chart-regiao'), {
+      type:'bar',
+      data:{ labels:rLabels, datasets:[{ data:rData, backgroundColor:rColors, borderRadius:6 }] },
+      options: commonOptions
+    });
+  }
+
+  function renderDispatch(filtered){
+    const list = document.getElementById('dispatch-list');
+    const prioritized = filtered.filter(d=>d.atraso > 0).sort((a,b)=> b.atraso - a.atraso);
+    if(prioritized.length === 0){
+      list.innerHTML = `<div class="ticket no-prazo">
+        <span class="ticket-id">—</span>
+        <div class="ticket-info">Nenhuma entrega atrasada no recorte atual. Operação dentro do prazo.</div>
+        <span class="ticket-badge">OK</span>
+      </div>`;
+      return;
+    }
+    list.innerHTML = prioritized.map((d,i)=>`
+      <div class="ticket ${d.status}">
+        <span class="ticket-id">#${d.id}</span>
+        <div class="ticket-info"><b>${i+1}º</b> — ${d.transportadora} · ${d.regiao} · prazo ${d.prazo}d, real ${d.real}d</div>
+        <span class="ticket-badge">+${d.atraso}d · ${statusLabel(d.status)}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderTable(filtered){
+    const tbody = document.querySelector('#tabela-entregas tbody');
+    if(filtered.length === 0){
+      tbody.innerHTML = '<tr><td colspan="7">Nenhuma entrega encontrada para os filtros selecionados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(d=>`
+      <tr class="row-${d.status}">
+        <td class="mono">#${d.id}</td>
+        <td>${d.transportadora}</td>
+        <td>${d.regiao}</td>
+        <td class="mono">${d.prazo}</td>
+        <td class="mono">${d.real}</td>
+        <td class="mono">${d.atraso > 0 ? '+' : ''}${d.atraso}</td>
+        <td class="status-cell">${statusLabel(d.status)}</td>
+      </tr>
+    `).join('');
+  }
+
+  function render(){
+    const filtered = getFiltered();
+    renderKPIs(filtered);
+    renderInsights(filtered);
+    renderCharts(filtered);
+    renderDispatch(filtered);
+    renderTable(filtered);
+  }
+
+  selectTransp.addEventListener('change', render);
+  selectRegiao.addEventListener('change', render);
+  document.getElementById('reset-filtros').addEventListener('click', ()=>{
+    selectTransp.value = 'todas';
+    selectRegiao.value = 'todas';
+    render();
+  });
+
+  render();
+</script>
+</body>
+</html>
